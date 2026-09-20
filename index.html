@@ -33,7 +33,7 @@
         }
     </style>
 </head>
-<body class="h-screen w-screen flex flex-col justify-between items-center p-1 overflow-hidden">
+<body class="w-screen h-[100dvh] flex flex-col items-center justify-between p-0.5 overflow-hidden">
 
     <!-- 旋轉提示層：當手機直立時顯示，要求轉為橫向 -->
     <div id="orientation-lock" class="fixed inset-0 bg-slate-950/95 z-50 flex-col items-center justify-center p-6 text-center hidden">
@@ -42,23 +42,23 @@
         <p class="text-xs text-slate-400">本遊戲專為橫向寬螢幕設計，以獲得最佳撞球體驗。</p>
     </div>
 
-    <!-- 頂端金句列 (縮小上下 padding 避免過高) -->
-    <header class="w-full max-w-4xl flex items-center justify-center py-0.5 px-3 z-10 bg-slate-900/60 rounded-lg border border-amber-500/20 my-0.5">
-        <div id="verse-ref" class="text-xs text-amber-300 font-medium text-center truncate">載入中...</div>
+    <!-- 頂端金句列 (極致壓縮高度，確保在行動瀏覽器網址列下方露出來) -->
+    <header class="w-full max-w-3xl flex items-center justify-center py-0 px-2 z-10 bg-slate-900/80 rounded border border-amber-500/20 shrink-0">
+        <div id="verse-ref" class="text-[11px] text-amber-300 font-medium text-center truncate">載入中...</div>
     </header>
 
-    <!-- 主遊戲區：確保能自適應手機橫向的緊湊高度 -->
-    <main class="relative w-full flex-1 flex items-center justify-center overflow-hidden my-0.5">
-        <div id="table-container" class="relative bg-emerald-900 rounded-2xl p-2 shadow-2xl border-4 border-amber-900/60 flex items-center justify-center overflow-hidden">
-            <canvas id="billiardCanvas" class="w-full h-full rounded-xl bg-emerald-800 shadow-inner"></canvas>
+    <!-- 主遊戲區：使用緊湊比例確保完全不超出畫面 -->
+    <main class="relative w-full flex-1 flex items-center justify-center overflow-hidden py-0.5">
+        <div id="table-container" class="relative bg-emerald-900 rounded-xl p-1.5 shadow-2xl border-2 border-amber-900/60 flex items-center justify-center overflow-hidden">
+            <canvas id="billiardCanvas" class="w-full h-full rounded-lg bg-emerald-800 shadow-inner"></canvas>
         </div>
 
-        <div id="victory-modal" class="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center z-30 hidden opacity-0 transition-opacity duration-500">
-            <div class="bg-slate-900 border border-amber-500/30 p-6 rounded-3xl shadow-2xl flex flex-col items-center text-center max-w-xs mx-auto">
-                <div class="text-4xl mb-3">✨</div>
-                <h2 class="text-2xl font-bold text-amber-200 mb-2">恭喜順利通關</h2>
-                <p id="victory-verse" class="text-sm text-slate-300 italic mb-6">「你要專心仰賴耶和華」</p>
-                <button id="restart-btn" class="w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold py-2.5 px-6 rounded-2xl shadow-lg transition-transform active:scale-95">
+        <div id="victory-modal" class="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center z-35 hidden opacity-0 transition-opacity duration-500">
+            <div class="bg-slate-900 border border-amber-500/30 p-4 rounded-2xl shadow-2xl flex flex-col items-center text-center max-w-xs mx-auto">
+                <div class="text-3xl mb-2">✨</div>
+                <h2 class="text-xl font-bold text-amber-200 mb-1">恭喜順利通關</h2>
+                <p id="victory-verse" class="text-xs text-slate-300 italic mb-4">「你要專心仰賴耶和華」</p>
+                <button id="restart-btn" class="w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold py-2 px-4 rounded-xl shadow-lg transition-transform active:scale-95 text-xs">
                     再敲一局
                 </button>
             </div>
@@ -207,14 +207,14 @@
             const container = canvas.parentElement;
             const containerRect = container.parentElement.getBoundingClientRect();
             
-            // 針對手機橫向空間微調比例佔比 (改為 0.88 確保安全邊距內)
-            let w = containerRect.width * 0.95;
-            let h = containerRect.height * 0.88;
+            // 採用更安全的高度比例係數（0.78），確保金句與球桌整體完全收納於可視區
+            let w = containerRect.width * 0.96;
+            let h = containerRect.height * 0.78;
             
-            if (w / h > 1.8) {
-                w = h * 1.8;
+            if (w / h > 1.9) {
+                w = h * 1.9;
             } else {
-                h = w / 1.8;
+                h = w / 1.9;
             }
 
             tableContainer.style.width = `${w}px`;
@@ -231,8 +231,8 @@
         }
 
         function setupPockets(allOpen) {
-            const margin = 16;
-            const pocketOffset = 6;
+            const margin = 14;
+            const pocketOffset = 5;
             pockets = [
                 { x: margin + pocketOffset, y: margin + pocketOffset, isOpen: allOpen },
                 { x: tableWidth / 2, y: margin + pocketOffset - 2, isOpen: allOpen },
@@ -249,7 +249,7 @@
 
         function setupBalls() {
             balls = [];
-            const radius = Math.min(tableWidth, tableHeight) * 0.05;
+            const radius = Math.min(tableWidth, tableHeight) * 0.052;
 
             cueBall = {
                 id: 0,
@@ -444,7 +444,7 @@
                 if (cueBall.vx !== 0 || cueBall.vy !== 0) anyMoving = true;
 
                 const r = cueBall.radius;
-                const margin = 16;
+                const margin = 14;
                 let bounced = false;
                 if (cueBall.x - r < margin) { cueBall.x = margin + r; cueBall.vx *= -1; bounced = true; }
                 if (cueBall.x + r > tableWidth - margin) { cueBall.x = tableWidth - margin - r; cueBall.vx *= -1; bounced = true; }
@@ -467,7 +467,7 @@
                 if (ball.vx !== 0 || ball.vy !== 0) anyMoving = true;
 
                 const r = ball.radius;
-                const margin = 16;
+                const margin = 14;
                 let bounced = false;
                 if (ball.x - r < margin) { ball.x = margin + r; ball.vx *= -1; bounced = true; }
                 if (ball.x + r > tableWidth - margin) { ball.x = tableWidth - margin - r; ball.vx *= -1; bounced = true; }
@@ -524,7 +524,7 @@
                 if (!cueBall.isPotted) {
                     const pdx = cueBall.x - pocket.x;
                     const pdy = cueBall.y - pocket.y;
-                    if (Math.sqrt(pdx * pdx + pdy * pdy) < 60) {
+                    if (Math.sqrt(pdx * pdx + pdy * pdy) < 38) {
                         playPocketSound();
                         cueBall.isPotted = true;
                         cueBall.vx = 0;
@@ -540,7 +540,7 @@
                     if (ball.isPotted) return;
                     const pdx = ball.x - pocket.x;
                     const pdy = ball.y - pocket.y;
-                    if (Math.sqrt(pdx * pdx + pdy * pdy) < 55) {
+                    if (Math.sqrt(pdx * pdx + pdy * pdy) < 35) {
                         playPocketSound();
                         const unpottedBalls = balls.filter(b => !b.isPotted).sort((a, b) => a.id - b.id);
                         const minId = unpottedBalls.length > 0 ? unpottedBalls[0].id : 0;
@@ -588,29 +588,29 @@
             animationTime += 0.05;
 
             ctx.fillStyle = '#047857';
-            ctx.fillRect(16, 16, tableWidth - 32, tableHeight - 32);
+            ctx.fillRect(14, 14, tableWidth - 28, tableHeight - 28);
 
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
             ctx.lineWidth = 2;
             ctx.setLineDash([4, 4]);
             ctx.beginPath();
-            ctx.moveTo(tableWidth / 2, 16);
-            ctx.lineTo(tableWidth / 2, tableHeight - 16);
+            ctx.moveTo(tableWidth / 2, 14);
+            ctx.lineTo(tableWidth / 2, tableHeight - 14);
             ctx.stroke();
             ctx.setLineDash([]);
 
             pockets.forEach(pocket => {
                 ctx.beginPath();
-                ctx.arc(pocket.x, pocket.y, 40, 0, Math.PI * 2);
+                ctx.arc(pocket.x, pocket.y, 32, 0, Math.PI * 2);
                 ctx.fillStyle = '#022c22';
                 ctx.fill();
-                ctx.lineWidth = 3;
+                ctx.lineWidth = 2;
                 ctx.strokeStyle = pocket.isOpen ? '#065f46' : '#991b1b';
                 ctx.stroke();
 
                 if (!pocket.isOpen) {
                     ctx.fillStyle = '#fca5a5';
-                    ctx.font = '10px sans-serif';
+                    ctx.font = '9px sans-serif';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText('🔒', pocket.x, pocket.y);
@@ -635,15 +635,15 @@
 
                     ctx.save();
                     ctx.strokeStyle = 'rgba(251, 191, 36, 0.9)';
-                    ctx.lineWidth = 4;
-                    ctx.setLineDash([6, 6]);
+                    ctx.lineWidth = 3;
+                    ctx.setLineDash([5, 5]);
                     ctx.beginPath();
                     ctx.moveTo(cueBall.x, cueBall.y);
                     ctx.lineTo(cueBall.x + forceX * 18, cueBall.y + forceY * 18);
                     ctx.stroke();
 
                     ctx.beginPath();
-                    ctx.arc(cueBall.x, cueBall.y, cueBall.radius + 6, 0, Math.PI * 2);
+                    ctx.arc(cueBall.x, cueBall.y, cueBall.radius + 5, 0, Math.PI * 2);
                     ctx.strokeStyle = 'rgba(251, 191, 36, 0.5)';
                     ctx.lineWidth = 2;
                     ctx.stroke();
@@ -685,7 +685,7 @@
 
                         ctx.save();
                         ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
-                        ctx.lineWidth = 3;
+                        ctx.lineWidth = 2;
                         ctx.setLineDash([4, 4]);
                         ctx.beginPath();
                         ctx.moveTo(closestBall.x, closestBall.y);
@@ -702,7 +702,7 @@
             if (!cueBall.isPotted) {
                 if (!isMoving) {
                     const pulse = Math.sin(animationTime * 3);
-                    const glowRadius = cueBall.radius + 5 + pulse * 3;
+                    const glowRadius = cueBall.radius + 4 + pulse * 2;
                     const alpha = 0.3 + pulse * 0.15;
 
                     ctx.save();
@@ -710,7 +710,7 @@
                     ctx.arc(cueBall.x, cueBall.y, glowRadius, 0, Math.PI * 2);
                     ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
                     ctx.shadowColor = '#ffffff';
-                    ctx.shadowBlur = 12 + pulse * 4;
+                    ctx.shadowBlur = 10 + pulse * 4;
                     ctx.fill();
                     ctx.restore();
                 }
@@ -719,7 +719,7 @@
                 ctx.arc(cueBall.x, cueBall.y, cueBall.radius, 0, Math.PI * 2);
                 ctx.fillStyle = cueBall.color;
                 ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = 6;
                 ctx.fill();
                 ctx.shadowBlur = 0;
             }
@@ -730,7 +730,7 @@
                 
                 if (isTarget) {
                     const pulse = Math.sin(animationTime * 3);
-                    const glowRadius = ball.radius + 6 + pulse * 4;
+                    const glowRadius = ball.radius + 5 + pulse * 3;
                     const alpha = 0.4 + pulse * 0.2;
 
                     ctx.save();
@@ -738,7 +738,7 @@
                     ctx.arc(ball.x, ball.y, glowRadius, 0, Math.PI * 2);
                     ctx.fillStyle = `rgba(251, 191, 36, ${alpha})`;
                     ctx.shadowColor = '#fbbf24';
-                    ctx.shadowBlur = 15 + pulse * 5;
+                    ctx.shadowBlur = 12 + pulse * 4;
                     ctx.fill();
                     ctx.restore();
                 }
@@ -747,14 +747,14 @@
                 ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
                 ctx.fillStyle = ball.color;
                 ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-                ctx.shadowBlur = 8;
+                ctx.shadowBlur = 6;
                 ctx.fill();
                 ctx.shadowBlur = 0;
 
                 if (isTarget) {
                     ctx.beginPath();
                     ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-                    ctx.lineWidth = 3;
+                    ctx.lineWidth = 2;
                     ctx.strokeStyle = '#fbbf24';
                     ctx.stroke();
                 }
