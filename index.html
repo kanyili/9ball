@@ -33,7 +33,7 @@
         }
     </style>
 </head>
-<body class="h-screen w-screen flex flex-col justify-between items-center p-2 overflow-hidden">
+<body class="h-screen w-screen flex flex-col justify-between items-center p-1 overflow-hidden">
 
     <!-- 旋轉提示層：當手機直立時顯示，要求轉為橫向 -->
     <div id="orientation-lock" class="fixed inset-0 bg-slate-950/95 z-50 flex-col items-center justify-center p-6 text-center hidden">
@@ -42,23 +42,23 @@
         <p class="text-xs text-slate-400">本遊戲專為橫向寬螢幕設計，以獲得最佳撞球體驗。</p>
     </div>
 
-    <header class="w-full max-w-4xl flex items-center justify-center py-1 px-4 z-10 bg-slate-900/60 rounded-xl border border-amber-500/20">
-        <!-- 聖經金句與出處 -->
-        <div id="verse-ref" class="text-xs text-amber-300 font-medium text-center">載入中...</div>
+    <!-- 頂端金句列 (縮小上下 padding 避免過高) -->
+    <header class="w-full max-w-4xl flex items-center justify-center py-0.5 px-3 z-10 bg-slate-900/60 rounded-lg border border-amber-500/20 my-0.5">
+        <div id="verse-ref" class="text-xs text-amber-300 font-medium text-center truncate">載入中...</div>
     </header>
 
-    <main class="relative w-full flex-1 flex items-center justify-center my-1 overflow-hidden">
-        <!-- 橫向比例的球桌容器 (橫屏優化) -->
-        <div id="table-container" class="relative bg-emerald-900 rounded-3xl p-3 shadow-2xl border-4 border-amber-900/60 flex items-center justify-center overflow-hidden">
-            <canvas id="billiardCanvas" class="w-full h-full rounded-2xl bg-emerald-800 shadow-inner"></canvas>
+    <!-- 主遊戲區：確保能自適應手機橫向的緊湊高度 -->
+    <main class="relative w-full flex-1 flex items-center justify-center overflow-hidden my-0.5">
+        <div id="table-container" class="relative bg-emerald-900 rounded-2xl p-2 shadow-2xl border-4 border-amber-900/60 flex items-center justify-center overflow-hidden">
+            <canvas id="billiardCanvas" class="w-full h-full rounded-xl bg-emerald-800 shadow-inner"></canvas>
         </div>
 
         <div id="victory-modal" class="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center z-30 hidden opacity-0 transition-opacity duration-500">
-            <div class="bg-slate-900 border border-amber-500/30 p-8 rounded-3xl shadow-2xl flex flex-col items-center text-center max-w-xs mx-auto">
+            <div class="bg-slate-900 border border-amber-500/30 p-6 rounded-3xl shadow-2xl flex flex-col items-center text-center max-w-xs mx-auto">
                 <div class="text-4xl mb-3">✨</div>
                 <h2 class="text-2xl font-bold text-amber-200 mb-2">恭喜順利通關</h2>
                 <p id="victory-verse" class="text-sm text-slate-300 italic mb-6">「你要專心仰賴耶和華」</p>
-                <button id="restart-btn" class="w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold py-3 px-6 rounded-2xl shadow-lg transition-transform active:scale-95">
+                <button id="restart-btn" class="w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold py-2.5 px-6 rounded-2xl shadow-lg transition-transform active:scale-95">
                     再敲一局
                 </button>
             </div>
@@ -85,7 +85,6 @@
             { text: "我將我的平安賜給你", ref: "約翰福音 14:27" }
         ];
 
-        // Web Audio API 音效系統初始化
         let audioCtx = null;
         function initAudio() {
             if (!audioCtx) {
@@ -104,13 +103,10 @@
                 osc.type = 'triangle';
                 osc.frequency.setValueAtTime(320, audioCtx.currentTime);
                 osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.05);
-
                 gain.gain.setValueAtTime(volume * 0.3, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
-
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
-
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.05);
             } catch (e) {}
@@ -124,13 +120,10 @@
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(160, audioCtx.currentTime);
                 osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.15);
-
                 gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
-
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
-
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.15);
             } catch (e) {}
@@ -144,13 +137,10 @@
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(220, audioCtx.currentTime);
                 osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.25);
-
                 gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
-
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
-
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.25);
             } catch (e) {}
@@ -173,7 +163,6 @@
         let isMoving = false;
         let breakDone = false;
         let initialSnapshot = null;
-        
         let firstHitBallId = null;
 
         let touchA = null; 
@@ -218,8 +207,9 @@
             const container = canvas.parentElement;
             const containerRect = container.parentElement.getBoundingClientRect();
             
+            // 針對手機橫向空間微調比例佔比 (改為 0.88 確保安全邊距內)
             let w = containerRect.width * 0.95;
-            let h = containerRect.height * 0.95;
+            let h = containerRect.height * 0.88;
             
             if (w / h > 1.8) {
                 w = h * 1.8;
@@ -534,7 +524,7 @@
                 if (!cueBall.isPotted) {
                     const pdx = cueBall.x - pocket.x;
                     const pdy = cueBall.y - pocket.y;
-                    if (Math.sqrt(pdx * pdx + pdy * pdy) < 60) { // 白球入袋判定放大
+                    if (Math.sqrt(pdx * pdx + pdy * pdy) < 60) {
                         playPocketSound();
                         cueBall.isPotted = true;
                         cueBall.vx = 0;
@@ -550,7 +540,7 @@
                     if (ball.isPotted) return;
                     const pdx = ball.x - pocket.x;
                     const pdy = ball.y - pocket.y;
-                    if (Math.sqrt(pdx * pdx + pdy * pdy) < 55) { // 目標球入袋判定放大
+                    if (Math.sqrt(pdx * pdx + pdy * pdy) < 55) {
                         playPocketSound();
                         const unpottedBalls = balls.filter(b => !b.isPotted).sort((a, b) => a.id - b.id);
                         const minId = unpottedBalls.length > 0 ? unpottedBalls[0].id : 0;
@@ -627,7 +617,6 @@
                 }
             });
 
-            // 瞄準與預測路徑繪製
             if (isAiming && touchA && touchB && !isMoving && !cueBall.isPotted) {
                 const dx = touchA.x - touchB.x;
                 const dy = touchA.y - touchB.y;
@@ -644,7 +633,6 @@
                         forceY = (forceY / speed) * maxPower;
                     }
 
-                    // 1. 繪製母球瞄準延伸線（已加粗並延長）
                     ctx.save();
                     ctx.strokeStyle = 'rgba(251, 191, 36, 0.9)';
                     ctx.lineWidth = 4;
@@ -661,7 +649,6 @@
                     ctx.stroke();
                     ctx.restore();
 
-                    // 2. 方案 A：預測第一顆被撞擊目標球的反彈路徑
                     let closestBall = null;
                     let minDist = Infinity;
                     const activeBalls = balls.filter(b => !b.isPotted);
@@ -713,7 +700,6 @@
             const currentTargetId = (breakDone && unpottedBalls.length > 0) ? unpottedBalls[0].id : -1;
 
             if (!cueBall.isPotted) {
-                // 白球可擊球呼吸光圈
                 if (!isMoving) {
                     const pulse = Math.sin(animationTime * 3);
                     const glowRadius = cueBall.radius + 5 + pulse * 3;
