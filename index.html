@@ -42,9 +42,10 @@
         <p class="text-xs text-slate-400">本遊戲專為橫向寬螢幕設計，以獲得最佳撞球體驗。</p>
     </div>
 
-    <!-- 頂端金句列 (極致壓縮高度，確保在行動瀏覽器網址列下方露出來) -->
-    <header class="w-full max-w-3xl flex items-center justify-center py-0 px-2 z-10 bg-slate-900/80 rounded border border-amber-500/20 shrink-0">
-        <div id="verse-ref" class="text-[11px] text-amber-300 font-medium text-center truncate">載入中...</div>
+    <!-- 頂端資訊列：金句與即時得分 -->
+    <header class="w-full max-w-3xl flex items-center justify-between py-0 px-3 z-10 bg-slate-900/80 rounded border border-amber-500/20 shrink-0">
+        <div id="verse-ref" class="text-[11px] text-amber-300 font-medium truncate mr-2">載入中...</div>
+        <div class="text-xs text-emerald-400 font-bold shrink-0">得分: <span id="score-display">0</span> 分</div>
     </header>
 
     <!-- 主遊戲區：使用緊湊比例確保完全不超出畫面 -->
@@ -57,6 +58,7 @@
             <div class="bg-slate-900 border border-amber-500/30 p-4 rounded-2xl shadow-2xl flex flex-col items-center text-center max-w-xs mx-auto">
                 <div class="text-3xl mb-2">✨</div>
                 <h2 class="text-xl font-bold text-amber-200 mb-1">恭喜順利通關</h2>
+                <p id="final-score-text" class="text-xs text-amber-400 font-bold mb-1">最終得分：0 分</p>
                 <p id="victory-verse" class="text-xs text-slate-300 italic mb-4">「你要專心仰賴耶和華」</p>
                 <button id="restart-btn" class="w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold py-2 px-4 rounded-xl shadow-lg transition-transform active:scale-95 text-xs">
                     再敲一局
@@ -149,8 +151,10 @@
         const canvas = document.getElementById('billiardCanvas');
         const ctx = canvas.getContext('2d');
         const verseRefEl = document.getElementById('verse-ref');
+        const scoreDisplayEl = document.getElementById('score-display');
         const victoryModal = document.getElementById('victory-modal');
         const victoryVerseEl = document.getElementById('victory-verse');
+        const finalScoreText = document.getElementById('final-score-text');
         const restartBtn = document.getElementById('restart-btn');
         const tableContainer = document.getElementById('table-container');
 
@@ -163,7 +167,7 @@
         let isMoving = false;
         let breakDone = false;
         let initialSnapshot = null;
-        let firstHitBallId = null;
+        let score = 0;
 
         let touchA = null; 
         let touchB = null; 
@@ -184,6 +188,9 @@
 
         function initGame() {
             initAudio();
+            score = 0;
+            scoreDisplayEl.textContent = score;
+
             const randomIdx = Math.floor(Math.random() * BIBLE_VERSES.length);
             currentVerse = BIBLE_VERSES[randomIdx];
             
@@ -191,7 +198,6 @@
             victoryVerseEl.textContent = `「${currentVerse.text}」 (${currentVerse.ref})`;
 
             breakDone = false;
-            firstHitBallId = null;
             victoryModal.classList.add('hidden', 'opacity-0');
 
             setupTableDimensions();
@@ -207,7 +213,6 @@
             const container = canvas.parentElement;
             const containerRect = container.parentElement.getBoundingClientRect();
             
-            // 採用更安全的高度比例係數（0.78），確保金句與球桌整體完全收納於可視區
             let w = containerRect.width * 0.96;
             let h = containerRect.height * 0.78;
             
@@ -405,29 +410,32 @@
             }
         }
 
-        function fireCueBall() {
-            if (!touchA || !touchB) return;
-            const dx = touchA.x - touchB.x;
-            const dy = touchA.y - touchB.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            if (distance < 5) return;
+function fireCueBall() {
+    if (!touchA || !touchB) return;
+    const dx = touchA.x - touchB.x;
+    const dy = touchA.y - touchB.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance < 5) return;
 
-            const maxPower = 40;
-            const powerFactor = 0.50;
-            let forceX = dx * powerFactor;
-            let forceY = dy * powerFactor;
+    const maxPower = 40;
+    
+    // 判斷是否為觸控裝置（手機/平板），如果是就給予較柔和的係數 0.18，PC滑鼠則維持 0.40
+    const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    const powerFactor = isTouchDevice ? 0.18 : 0.40; 
 
-            const speed = Math.sqrt(forceX * forceX + forceY * forceY);
-            if (speed > maxPower) {
-                forceX = (forceX / speed) * maxPower;
-                forceY = (forceY / speed) * maxPower;
-            }
+    let forceX = dx * powerFactor;
+    let forceY = dy * powerFactor;
 
-            cueBall.vx = forceX;
-            cueBall.vy = forceY;
-            firstHitBallId = null;
-            isMoving = true;
-        }
+    const speed = Math.sqrt(forceX * forceX + forceY * forceY);
+    if (speed > maxPower) {
+        forceX = (forceX / speed) * maxPower;
+        forceY = (forceY / speed) * maxPower;
+    }
+
+    cueBall.vx = forceX;
+    cueBall.vy = forceY;
+    isMoving = true;
+}
 
         function updatePhysics() {
             const friction = 0.980;
@@ -490,13 +498,6 @@
 
                     if (dist < minDist) {
                         playHitSound(0.45);
-                        if ((b1.id === 0 && b2.id !== 0) || (b2.id === 0 && b1.id !== 0)) {
-                            const targetBall = (b1.id === 0) ? b2 : b1;
-                            if (firstHitBallId === null) {
-                                firstHitBallId = targetBall.id;
-                            }
-                        }
-
                         const overlap = 0.5 * (minDist - dist);
                         const nx = dx / dist;
                         const ny = dy / dist;
@@ -521,6 +522,7 @@
             pockets.forEach(pocket => {
                 if (!pocket.isOpen) return;
 
+                // 檢查白球是否進袋（唯一的犯規判定）
                 if (!cueBall.isPotted) {
                     const pdx = cueBall.x - pocket.x;
                     const pdy = cueBall.y - pocket.y;
@@ -530,36 +532,36 @@
                         cueBall.vx = 0;
                         cueBall.vy = 0;
                         setTimeout(() => {
-                            restoreSnapshot();
+                            restoreSnapshot(); // 觸發防守懲罰，重置畫面
                             isMoving = false;
                         }, 800);
                     }
                 }
 
+                // 檢查子球進袋
                 balls.forEach(ball => {
                     if (ball.isPotted) return;
                     const pdx = ball.x - pocket.x;
                     const pdy = ball.y - pocket.y;
                     if (Math.sqrt(pdx * pdx + pdy * pdy) < 35) {
                         playPocketSound();
+                        
+                        if (!breakDone) return; // 開球第一桿不計算得分
+
+                        // 判斷是否按照順序進袋
                         const unpottedBalls = balls.filter(b => !b.isPotted).sort((a, b) => a.id - b.id);
                         const minId = unpottedBalls.length > 0 ? unpottedBalls[0].id : 0;
 
-                        if (!breakDone) return;
+                        ball.isPotted = true;
+                        ball.vx = 0;
+                        ball.vy = 0;
 
-                        const isFoul = (firstHitBallId !== minId) || (ball.id !== minId);
-
-                        if (isFoul) {
-                            ball.isPotted = true;
-                            setTimeout(() => {
-                                restoreSnapshot();
-                                isMoving = false;
-                            }, 800);
+                        if (ball.id === minId) {
+                            score += 1; // 順序正確，得 1 分
                         } else {
-                            ball.isPotted = true;
-                            ball.vx = 0;
-                            ball.vy = 0;
+                            score += 0; // 順序錯誤，得 0 分
                         }
+                        scoreDisplayEl.textContent = score;
                     }
                 });
             });
@@ -574,10 +576,11 @@
                 if (!cueBall.isPotted) {
                     const remaining = balls.filter(b => !b.isPotted);
                     if (remaining.length === 0) {
+                        finalScoreText.textContent = `最終得分：${score} 分`;
                         victoryModal.classList.remove('hidden');
                         setTimeout(() => victoryModal.classList.remove('opacity-0'), 10);
                     } else {
-                        saveSnapshot();
+                        saveSnapshot(); // 保存新一桿的初始位置
                     }
                 }
             }
