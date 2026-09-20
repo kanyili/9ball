@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
+    <title>聖經金句9號球</title>
+    <!-- Tailwind CSS for minimalist modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            touch-action: none;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        canvas {
+            touch-action: none;
+            display: block;
+        }
+        /* 手機直向時的旋轉提示遮罩 */
+        @media screen and (orientation: portrait) {
+            #orientation-lock {
+                display: flex;
+            }
+        }
+        @media screen and (orientation: landscape) {
+            #orientation-lock {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between items-center p-2 overflow-hidden">
+
+    <!-- 旋轉提示層：當手機直立時顯示，要求轉為橫向 -->
+    <div id="orientation-lock" class="fixed inset-0 bg-slate-950/95 z-50 flex-col items-center justify-center p-6 text-center hidden">
+        <div class="text-5xl mb-4 animate-bounce">📱 🔄</div>
+        <h2 class="text-xl font-bold text-amber-300 mb-2">請將手機轉為橫向遊玩</h2>
+        <p class="text-xs text-slate-400">本遊戲專為橫向寬螢幕設計，以獲得最佳撞球體驗。</p>
+    </div>
+
+    <header class="w-full max-w-4xl flex items-center justify-center py-1 px-4 z-10 bg-slate-900/60 rounded-xl border border-amber-500/20">
+        <!-- 聖經金句與出處 -->
+        <div id="verse-ref" class="text-xs text-amber-300 font-medium text-center">載入中...</div>
+    </header>
+
+    <main class="relative w-full flex-1 flex items-center justify-center my-1 overflow-hidden">
+        <!-- 橫向比例的球桌容器 (橫屏優化) -->
+        <div id="table-container" class="relative bg-emerald-900 rounded-3xl p-3 shadow-2xl border-4 border-amber-900/60 flex items-center justify-center overflow-hidden">
+            <canvas id="billiardCanvas" class="w-full h-full rounded-2xl bg-emerald-800 shadow-inner"></canvas>
+        </div>
+
+        <div id="victory-modal" class="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center z-30 hidden opacity-0 transition-opacity duration-500">
+            <div class="bg-slate-900 border border-amber-500/30 p-8 rounded-3xl shadow-2xl flex flex-col items-center text-center max-w-xs mx-auto">
+                <div class="text-4xl mb-3">✨</div>
+                <h2 class="text-2xl font-bold text-amber-200 mb-2">恭喜順利通關</h2>
+                <p id="victory-verse" class="text-sm text-slate-300 italic mb-6">「你要專心仰賴耶和華」</p>
+                <button id="restart-btn" class="w-full bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-semibold py-3 px-6 rounded-2xl shadow-lg transition-transform active:scale-95">
+                    再敲一局
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const BIBLE_VERSES = [
+            { text: "神的靈運行在水面上", ref: "創世記 1:2" },
+            { text: "你要專心仰賴耶和華", ref: "箴言 3:5" },
+            { text: "不可倚靠自己的聰明", ref: "箴言 3:5" },
+            { text: "领我在可安歇的水邊", ref: "詩篇 23:2" },
+            { text: "我靠著那加給我力量", ref: "腓立比書 4:13" },
+            { text: "你們若遵行我所吩咐", ref: "約翰福音 15:14" },
+            { text: "常常喜樂不住地禱告", ref: "帖撒羅尼迦前書 5:16–17" },
+            { text: "不住地禱告凡事謝恩", ref: "帖撒羅尼迦前書 5:17–18" },
+            { text: "一切信他的不致滅亡", ref: "約翰福音 3:16" },
+            { text: "已將萬有交在他手裏", ref: "約翰福音 3:35" },
+            { text: "義人呼求耶和華聽見", ref: "詩篇 34:17" },
+            { text: "救他們脫離一切患難", ref: "詩篇 34:17" },
+            { text: "耶和華靠近傷心的人", ref: "詩篇 34:18" },
+            { text: "凡投靠他必不致定罪", ref: "詩篇 34:22" },
+            { text: "神若幫助我們誰能敵", ref: "羅馬書 8:31" },
+            { text: "我將我的平安賜給你", ref: "約翰福音 14:27" }
+        ];
+
+        // Web Audio API 音效系統初始化
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playHitSound(volume = 0.4) {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(320, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.05);
+
+                gain.gain.setValueAtTime(volume * 0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.05);
+            } catch (e) {}
+        }
+
+        function playPocketSound() {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(160, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.15);
+
+                gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.15);
+            } catch (e) {}
+        }
+
+        function playFoulSound() {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.25);
+
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.25);
+            } catch (e) {}
+        }
+
+        const canvas = document.getElementById('billiardCanvas');
+        const ctx = canvas.getContext('2d');
+        const verseRefEl = document.getElementById('verse-ref');
+        const victoryModal = document.getElementById('victory-modal');
+        const victoryVerseEl = document.getElementById('victory-verse');
+        const restartBtn = document.getElementById('restart-btn');
+        const tableContainer = document.getElementById('table-container');
+
+        let tableWidth = 800;
+        let tableHeight = 400;
+        let currentVerse = null;
+        let balls = [];
+        let pockets = [];
+        let cueBall = null;
+        let isMoving = false;
+        let breakDone = false;
+        let initialSnapshot = null;
+        
+        let firstHitBallId = null;
+
+        let touchA = null; 
+        let touchB = null; 
+        let isAiming = false;
+        let animationTime = 0;
+
+        const specificBallColors = {
+            1: '#eab308', 
+            2: '#3b82f6', 
+            3: '#ef4444', 
+            4: '#a855f7', 
+            5: '#f97316', 
+            6: '#22c55e', 
+            7: '#b91c1c', 
+            8: '#1e293b', 
+            9: '#e11d48'  
+        };
+
+        function initGame() {
+            initAudio();
+            const randomIdx = Math.floor(Math.random() * BIBLE_VERSES.length);
+            currentVerse = BIBLE_VERSES[randomIdx];
+            
+            verseRefEl.textContent = `「${currentVerse.text}」 (${currentVerse.ref})`;
+            victoryVerseEl.textContent = `「${currentVerse.text}」 (${currentVerse.ref})`;
+
+            breakDone = false;
+            firstHitBallId = null;
+            victoryModal.classList.add('hidden', 'opacity-0');
+
+            setupTableDimensions();
+            setupPockets(false);
+            setupBalls();
+            saveSnapshot();
+            
+            isMoving = false;
+            requestAnimationFrame(gameLoop);
+        }
+
+        function setupTableDimensions() {
+            const container = canvas.parentElement;
+            const containerRect = container.parentElement.getBoundingClientRect();
+            
+            let w = containerRect.width * 0.95;
+            let h = containerRect.height * 0.95;
+            
+            if (w / h > 1.8) {
+                w = h * 1.8;
+            } else {
+                h = w / 1.8;
+            }
+
+            tableContainer.style.width = `${w}px`;
+            tableContainer.style.height = `${h}px`;
+
+            canvas.width = w * window.devicePixelRatio;
+            canvas.height = h * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+            tableWidth = w;
+            tableHeight = h;
+            
+            setupPockets(breakDone);
+        }
+
+        function setupPockets(allOpen) {
+            const margin = 16;
+            const pocketOffset = 6;
+            pockets = [
+                { x: margin + pocketOffset, y: margin + pocketOffset, isOpen: allOpen },
+                { x: tableWidth / 2, y: margin + pocketOffset - 2, isOpen: allOpen },
+                { x: tableWidth - margin - pocketOffset, y: margin + pocketOffset, isOpen: allOpen },
+                { x: margin + pocketOffset, y: tableHeight - margin - pocketOffset, isOpen: allOpen },
+                { x: tableWidth / 2, y: tableHeight - margin - pocketOffset + 2, isOpen: allOpen },
+                { x: tableWidth - margin - pocketOffset, y: tableHeight - margin - pocketOffset, isOpen: allOpen }
+            ];
+        }
+
+        function setAllPocketsState(open) {
+            pockets.forEach(p => p.isOpen = open);
+        }
+
+        function setupBalls() {
+            balls = [];
+            const radius = Math.min(tableWidth, tableHeight) * 0.05;
+
+            cueBall = {
+                id: 0,
+                label: ' ',
+                x: tableWidth * 0.75,
+                y: tableHeight / 2,
+                vx: 0,
+                vy: 0,
+                radius: radius * 0.50,
+                color: '#f8fafc',
+                isPotted: false
+            };
+
+            const startX = tableWidth * 0.30;
+            const startY = tableHeight / 2;
+            const spacingX = radius * 1.8;
+            const spacingY = radius * 2.1;
+            const chars = currentVerse.text.split('');
+
+            const layoutConfig = [
+                { id: 1, col: 0, row: 0 },
+                { id: 2, col: 1, row: -0.6 }, 
+                { id: 3, col: 1, row: 0.6 },  
+                { id: 4, col: 2, row: -1.2 }, 
+                { id: 9, col: 2, row: 0 },    
+                { id: 5, col: 2, row: 1.2 },  
+                { id: 6, col: 3, row: -0.6 }, 
+                { id: 7, col: 3, row: 0.6 },  
+                { id: 8, col: 4, row: 0     }     
+            ];
+
+            layoutConfig.forEach((cfg, index) => {
+                const ballNum = cfg.id;
+                const char = chars[index] || String(ballNum);
+                const x = startX + cfg.col * spacingX;
+                const y = startY + cfg.row * (spacingY * 0.85);
+
+                balls.push({
+                    id: ballNum,
+                    label: char,
+                    x: x,
+                    y: y,
+                    vx: 0,
+                    vy: 0,
+                    radius: radius * 0.9,
+                    color: specificBallColors[ballNum],
+                    isPotted: false
+                });
+            });
+        }
+
+        function saveSnapshot() {
+            initialSnapshot = {
+                cueBall: { x: cueBall.x, y: cueBall.y, vx: 0, vy: 0, isPotted: cueBall.isPotted },
+                balls: balls.map(b => ({ id: b.id, x: b.x, y: b.y, vx: 0, vy: 0, isPotted: b.isPotted }))
+            };
+        }
+
+        function restoreSnapshot() {
+            playFoulSound();
+            cueBall.x = initialSnapshot.cueBall.x;
+            cueBall.y = initialSnapshot.cueBall.y;
+            cueBall.vx = 0;
+            cueBall.vy = 0;
+            cueBall.isPotted = false;
+
+            initialSnapshot.balls.forEach(snap => {
+                const b = balls.find(item => item.id === snap.id);
+                if (b) {
+                    b.x = snap.x;
+                    b.y = snap.y;
+                    b.vx = 0;
+                    b.vy = 0;
+                    b.isPotted = snap.isPotted;
+                }
+            });
+        }
+
+        canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+        canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+        canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+        let isMouseDown = false;
+        canvas.addEventListener('mousedown', (e) => {
+            initAudio();
+            if (isMoving || cueBall.isPotted) return;
+            isMouseDown = true;
+            const rect = canvas.getBoundingClientRect();
+            touchA = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            touchB = { x: cueBall.x, y: cueBall.y };
+            isAiming = true;
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (!isMouseDown || isMoving || cueBall.isPotted) return;
+            const rect = canvas.getBoundingClientRect();
+            touchB = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        });
+        window.addEventListener('mouseup', () => {
+            if (!isMouseDown) return;
+            isMouseDown = false;
+            if (isAiming) fireCueBall();
+            touchA = null;
+            touchB = null;
+            isAiming = false;
+        });
+
+        function handleTouchStart(e) {
+            e.preventDefault();
+            initAudio();
+            if (isMoving || cueBall.isPotted) return;
+            const rect = canvas.getBoundingClientRect();
+            const touches = e.touches;
+
+            if (touches.length >= 1) {
+                touchA = { x: touches[0].clientX - rect.left, y: touches[0].clientY - rect.top };
+            }
+            if (touches.length >= 2) {
+                touchB = { x: touches[1].clientX - rect.left, y: touches[1].clientY - rect.top };
+                isAiming = true;
+            } else {
+                touchB = { x: cueBall.x, y: cueBall.y };
+                isAiming = true;
+            }
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+            if (!isAiming || isMoving || cueBall.isPotted) return;
+            const rect = canvas.getBoundingClientRect();
+            const touches = e.touches;
+
+            if (touches.length >= 1) {
+                touchA = { x: touches[0].clientX - rect.left, y: touches[0].clientY - rect.top };
+            }
+            if (touches.length >= 2) {
+                touchB = { x: touches[1].clientX - rect.left, y: touches[1].clientY - rect.top };
+            }
+        }
+
+        function handleTouchEnd(e) {
+            e.preventDefault();
+            if (!isAiming) return;
+            if (e.touches.length === 0) {
+                fireCueBall();
+                touchA = null;
+                touchB = null;
+                isAiming = false;
+            } else if (e.touches.length === 1) {
+                const rect = canvas.getBoundingClientRect();
+                touchA = { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+                touchB = { x: cueBall.x, y: cueBall.y };
+            }
+        }
+
+        function fireCueBall() {
+            if (!touchA || !touchB) return;
+            const dx = touchA.x - touchB.x;
+            const dy = touchA.y - touchB.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < 5) return;
+
+            const maxPower = 40;
+            const powerFactor = 0.50;
+            let forceX = dx * powerFactor;
+            let forceY = dy * powerFactor;
+
+            const speed = Math.sqrt(forceX * forceX + forceY * forceY);
+            if (speed > maxPower) {
+                forceX = (forceX / speed) * maxPower;
+                forceY = (forceY / speed) * maxPower;
+            }
+
+            cueBall.vx = forceX;
+            cueBall.vy = forceY;
+            firstHitBallId = null;
+            isMoving = true;
+        }
+
+        function updatePhysics() {
+            const friction = 0.980;
+            let anyMoving = false;
+
+            if (!cueBall.isPotted) {
+                cueBall.x += cueBall.vx;
+                cueBall.y += cueBall.vy;
+                cueBall.vx *= friction;
+                cueBall.vy *= friction;
+
+                if (Math.abs(cueBall.vx) < 0.05) cueBall.vx = 0;
+                if (Math.abs(cueBall.vy) < 0.05) cueBall.vy = 0;
+                if (cueBall.vx !== 0 || cueBall.vy !== 0) anyMoving = true;
+
+                const r = cueBall.radius;
+                const margin = 16;
+                let bounced = false;
+                if (cueBall.x - r < margin) { cueBall.x = margin + r; cueBall.vx *= -1; bounced = true; }
+                if (cueBall.x + r > tableWidth - margin) { cueBall.x = tableWidth - margin - r; cueBall.vx *= -1; bounced = true; }
+                if (cueBall.y - r < margin) { cueBall.y = margin + r; cueBall.vy *= -1; bounced = true; }
+                if (cueBall.y + r > tableHeight - margin) { cueBall.y = tableHeight - margin - r; cueBall.vy *= -1; bounced = true; }
+                if (bounced && (Math.abs(cueBall.vx) > 0.5 || Math.abs(cueBall.vy) > 0.5)) {
+                    playHitSound(0.25);
+                }
+            }
+
+            balls.forEach(ball => {
+                if (ball.isPotted) return;
+                ball.x += ball.vx;
+                ball.y += ball.vy;
+                ball.vx *= friction;
+                ball.vy *= friction;
+
+                if (Math.abs(ball.vx) < 0.05) ball.vx = 0;
+                if (Math.abs(ball.vy) < 0.05) ball.vy = 0;
+                if (ball.vx !== 0 || ball.vy !== 0) anyMoving = true;
+
+                const r = ball.radius;
+                const margin = 16;
+                let bounced = false;
+                if (ball.x - r < margin) { ball.x = margin + r; ball.vx *= -1; bounced = true; }
+                if (ball.x + r > tableWidth - margin) { ball.x = tableWidth - margin - r; ball.vx *= -1; bounced = true; }
+                if (ball.y - r < margin) { ball.y = margin + r; ball.vy *= -1; bounced = true; }
+                if (ball.y + r > tableHeight - margin) { ball.y = tableHeight - margin - r; ball.vy *= -1; bounced = true; }
+                if (bounced && (Math.abs(ball.vx) > 0.5 || Math.abs(ball.vy) > 0.5)) {
+                    playHitSound(0.25);
+                }
+            });
+
+            const allBalls = [cueBall, ...balls.filter(b => !b.isPotted)];
+            for (let i = 0; i < allBalls.length; i++) {
+                for (let j = i + 1; j < allBalls.length; j++) {
+                    const b1 = allBalls[i];
+                    const b2 = allBalls[j];
+                    const dx = b2.x - b1.x;
+                    const dy = b2.y - b1.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const minDist = b1.radius + b2.radius;
+
+                    if (dist < minDist) {
+                        playHitSound(0.45);
+                        if ((b1.id === 0 && b2.id !== 0) || (b2.id === 0 && b1.id !== 0)) {
+                            const targetBall = (b1.id === 0) ? b2 : b1;
+                            if (firstHitBallId === null) {
+                                firstHitBallId = targetBall.id;
+                            }
+                        }
+
+                        const overlap = 0.5 * (minDist - dist);
+                        const nx = dx / dist;
+                        const ny = dy / dist;
+
+                        b1.x -= nx * overlap;
+                        b1.y -= ny * overlap;
+                        b2.x += nx * overlap;
+                        b2.y += ny * overlap;
+
+                        const kx = b1.vx - b2.vx;
+                        const ky = b1.vy - b2.vy;
+                        const p = 2 * (nx * kx + ny * ky) / 2;
+
+                        b1.vx -= p * nx;
+                        b1.vy -= p * ny;
+                        b2.vx += p * nx;
+                        b2.vy += p * ny;
+                    }
+                }
+            }
+
+            pockets.forEach(pocket => {
+                if (!pocket.isOpen) return;
+
+                if (!cueBall.isPotted) {
+                    const pdx = cueBall.x - pocket.x;
+                    const pdy = cueBall.y - pocket.y;
+                    if (Math.sqrt(pdx * pdx + pdy * pdy) < 60) { // 白球入袋判定放大
+                        playPocketSound();
+                        cueBall.isPotted = true;
+                        cueBall.vx = 0;
+                        cueBall.vy = 0;
+                        setTimeout(() => {
+                            restoreSnapshot();
+                            isMoving = false;
+                        }, 800);
+                    }
+                }
+
+                balls.forEach(ball => {
+                    if (ball.isPotted) return;
+                    const pdx = ball.x - pocket.x;
+                    const pdy = ball.y - pocket.y;
+                    if (Math.sqrt(pdx * pdx + pdy * pdy) < 55) { // 目標球入袋判定放大
+                        playPocketSound();
+                        const unpottedBalls = balls.filter(b => !b.isPotted).sort((a, b) => a.id - b.id);
+                        const minId = unpottedBalls.length > 0 ? unpottedBalls[0].id : 0;
+
+                        if (!breakDone) return;
+
+                        const isFoul = (firstHitBallId !== minId) || (ball.id !== minId);
+
+                        if (isFoul) {
+                            ball.isPotted = true;
+                            setTimeout(() => {
+                                restoreSnapshot();
+                                isMoving = false;
+                            }, 800);
+                        } else {
+                            ball.isPotted = true;
+                            ball.vx = 0;
+                            ball.vy = 0;
+                        }
+                    }
+                });
+            });
+
+            if (isMoving && !anyMoving) {
+                isMoving = false;
+                if (!breakDone) {
+                    breakDone = true;
+                    setAllPocketsState(true);
+                }
+
+                if (!cueBall.isPotted) {
+                    const remaining = balls.filter(b => !b.isPotted);
+                    if (remaining.length === 0) {
+                        victoryModal.classList.remove('hidden');
+                        setTimeout(() => victoryModal.classList.remove('opacity-0'), 10);
+                    } else {
+                        saveSnapshot();
+                    }
+                }
+            }
+        }
+
+        function drawTable() {
+            ctx.clearRect(0, 0, tableWidth, tableHeight);
+            animationTime += 0.05;
+
+            ctx.fillStyle = '#047857';
+            ctx.fillRect(16, 16, tableWidth - 32, tableHeight - 32);
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(tableWidth / 2, 16);
+            ctx.lineTo(tableWidth / 2, tableHeight - 16);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            pockets.forEach(pocket => {
+                ctx.beginPath();
+                ctx.arc(pocket.x, pocket.y, 40, 0, Math.PI * 2);
+                ctx.fillStyle = '#022c22';
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = pocket.isOpen ? '#065f46' : '#991b1b';
+                ctx.stroke();
+
+                if (!pocket.isOpen) {
+                    ctx.fillStyle = '#fca5a5';
+                    ctx.font = '10px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('🔒', pocket.x, pocket.y);
+                }
+            });
+
+            // 瞄準與預測路徑繪製
+            if (isAiming && touchA && touchB && !isMoving && !cueBall.isPotted) {
+                const dx = touchA.x - touchB.x;
+                const dy = touchA.y - touchB.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance >= 5) {
+                    const maxPower = 40;
+                    const powerFactor = 0.50;
+                    let forceX = dx * powerFactor;
+                    let forceY = dy * powerFactor;
+                    const speed = Math.sqrt(forceX * forceX + forceY * forceY);
+                    if (speed > maxPower) {
+                        forceX = (forceX / speed) * maxPower;
+                        forceY = (forceY / speed) * maxPower;
+                    }
+
+                    // 1. 繪製母球瞄準延伸線（已加粗並延長）
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(251, 191, 36, 0.9)';
+                    ctx.lineWidth = 4;
+                    ctx.setLineDash([6, 6]);
+                    ctx.beginPath();
+                    ctx.moveTo(cueBall.x, cueBall.y);
+                    ctx.lineTo(cueBall.x + forceX * 18, cueBall.y + forceY * 18);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.arc(cueBall.x, cueBall.y, cueBall.radius + 6, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(251, 191, 36, 0.5)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    ctx.restore();
+
+                    // 2. 方案 A：預測第一顆被撞擊目標球的反彈路徑
+                    let closestBall = null;
+                    let minDist = Infinity;
+                    const activeBalls = balls.filter(b => !b.isPotted);
+
+                    const steps = 50;
+                    let simX = cueBall.x;
+                    let simY = cueBall.y;
+                    const stepVx = forceX;
+                    const stepVy = forceY;
+
+                    for (let s = 1; s <= steps; s++) {
+                        simX += stepVx;
+                        simY += stepVy;
+                        for (let b of activeBalls) {
+                            const bdx = b.x - simX;
+                            const bdy = b.y - simY;
+                            const bdist = Math.sqrt(bdx * bdx + bdy * bdy);
+                            if (bdist <= cueBall.radius + b.radius) {
+                                const distFromStart = Math.sqrt((b.x - cueBall.x)**2 + (b.y - cueBall.y)**2);
+                                if (distFromStart < minDist) {
+                                    minDist = distFromStart;
+                                    closestBall = b;
+                                }
+                            }
+                        }
+                        if (closestBall) break;
+                    }
+
+                    if (closestBall) {
+                        const angle = Math.atan2(closestBall.y - simY, closestBall.x - simX);
+                        const targetDirX = Math.cos(angle);
+                        const targetDirY = Math.sin(angle);
+                        const targetSpeed = Math.sqrt(forceX * forceX + forceY * forceY);
+
+                        ctx.save();
+                        ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+                        ctx.lineWidth = 3;
+                        ctx.setLineDash([4, 4]);
+                        ctx.beginPath();
+                        ctx.moveTo(closestBall.x, closestBall.y);
+                        ctx.lineTo(closestBall.x + targetDirX * targetSpeed * 10, closestBall.y + targetDirY * targetSpeed * 10);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                }
+            }
+
+            const unpottedBalls = balls.filter(b => !b.isPotted).sort((a, b) => a.id - b.id);
+            const currentTargetId = (breakDone && unpottedBalls.length > 0) ? unpottedBalls[0].id : -1;
+
+            if (!cueBall.isPotted) {
+                // 白球可擊球呼吸光圈
+                if (!isMoving) {
+                    const pulse = Math.sin(animationTime * 3);
+                    const glowRadius = cueBall.radius + 5 + pulse * 3;
+                    const alpha = 0.3 + pulse * 0.15;
+
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(cueBall.x, cueBall.y, glowRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                    ctx.shadowColor = '#ffffff';
+                    ctx.shadowBlur = 12 + pulse * 4;
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                ctx.beginPath();
+                ctx.arc(cueBall.x, cueBall.y, cueBall.radius, 0, Math.PI * 2);
+                ctx.fillStyle = cueBall.color;
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+                ctx.shadowBlur = 8;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            balls.forEach(ball => {
+                if (ball.isPotted) return;
+                const isTarget = (ball.id === currentTargetId);
+                
+                if (isTarget) {
+                    const pulse = Math.sin(animationTime * 3);
+                    const glowRadius = ball.radius + 6 + pulse * 4;
+                    const alpha = 0.4 + pulse * 0.2;
+
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(ball.x, ball.y, glowRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(251, 191, 36, ${alpha})`;
+                    ctx.shadowColor = '#fbbf24';
+                    ctx.shadowBlur = 15 + pulse * 5;
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                ctx.fillStyle = ball.color;
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+                ctx.shadowBlur = 8;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                if (isTarget) {
+                    ctx.beginPath();
+                    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = '#fbbf24';
+                    ctx.stroke();
+                }
+
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.radius * 0.75, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+
+                ctx.fillStyle = '#0f172a';
+                ctx.font = `bold ${Math.floor(ball.radius * 0.85)}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(ball.label, ball.x, ball.y);
+            });
+        }
+
+        function gameLoop() {
+            updatePhysics();
+            drawTable();
+            requestAnimationFrame(gameLoop);
+        }
+
+        restartBtn.addEventListener('click', () => initGame());
+
+        window.addEventListener('resize', () => {
+            setupTableDimensions();
+            if (!isMoving) {
+                setupBalls();
+                saveSnapshot();
+            }
+        });
+
+        window.onload = function() {
+            initGame();
+        };
+    </script>
+</body>
+</html>
