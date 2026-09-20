@@ -777,10 +777,14 @@ const maxPower = 40;
                 ctx.fill();
 
                 ctx.fillStyle = '#0f172a';
-                ctx.font = `bold ${Math.floor(ball.radius * 0.85)}px sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(ball.label, ball.x, ball.y);
+// 判斷是否為手機觸控裝置，如果是則放大字體比例，PC則維持較小比例
+const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+const fontMultiplier = isTouchDevice ? 1.2 : 0.85;
+
+ctx.font = `bold ${Math.floor(ball.radius * fontMultiplier)}px sans-serif`;
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+ctx.fillText(ball.label, ball.x, ball.y);
             });
         }
 
