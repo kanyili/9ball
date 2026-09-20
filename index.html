@@ -235,18 +235,23 @@
             setupPockets(breakDone);
         }
 
-        function setupPockets(allOpen) {
-            const margin = 14;
-            const pocketOffset = 5;
-            pockets = [
-                { x: margin + pocketOffset, y: margin + pocketOffset, isOpen: allOpen },
-                { x: tableWidth / 2, y: margin + pocketOffset - 2, isOpen: allOpen },
-                { x: tableWidth - margin - pocketOffset, y: margin + pocketOffset, isOpen: allOpen },
-                { x: margin + pocketOffset, y: tableHeight - margin - pocketOffset, isOpen: allOpen },
-                { x: tableWidth / 2, y: tableHeight - margin - pocketOffset + 2, isOpen: allOpen },
-                { x: tableWidth - margin - pocketOffset, y: tableHeight - margin - pocketOffset, isOpen: allOpen }
-            ];
-        }
+function setupPockets(allOpen) {
+    const margin = 14;
+    const pocketOffset = 5;
+    
+    // 依據螢幕尺寸動態調整袋口判定範圍（手機版稍微縮小，避免太容易進球）
+    const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    const pocketRadius = isTouchDevice ? 28 : 32; // 手機用 28，PC用 32
+
+    pockets = [
+        { x: margin + pocketOffset, y: margin + pocketOffset, isOpen: allOpen, radius: pocketRadius },
+        { x: tableWidth / 2, y: margin + pocketOffset - 2, isOpen: allOpen, radius: pocketRadius },
+        { x: tableWidth - margin - pocketOffset, y: margin + pocketOffset, isOpen: allOpen, radius: pocketRadius },
+        { x: margin + pocketOffset, y: tableHeight - margin - pocketOffset, isOpen: allOpen, radius: pocketRadius },
+        { x: tableWidth / 2, y: tableHeight - margin - pocketOffset + 2, isOpen: allOpen, radius: pocketRadius },
+        { x: tableWidth - margin - pocketOffset, y: tableHeight - margin - pocketOffset, isOpen: allOpen, radius: pocketRadius }
+    ];
+}
 
         function setAllPocketsState(open) {
             pockets.forEach(p => p.isOpen = open);
@@ -519,52 +524,53 @@ function fireCueBall() {
                 }
             }
 
-            pockets.forEach(pocket => {
-                if (!pocket.isOpen) return;
+pockets.forEach(pocket => {
+    if (!pocket.isOpen) return;
 
-                // 檢查白球是否進袋（唯一的犯規判定）
-                if (!cueBall.isPotted) {
-                    const pdx = cueBall.x - pocket.x;
-                    const pdy = cueBall.y - pocket.y;
-                    if (Math.sqrt(pdx * pdx + pdy * pdy) < 38) {
-                        playPocketSound();
-                        cueBall.isPotted = true;
-                        cueBall.vx = 0;
-                        cueBall.vy = 0;
-                        setTimeout(() => {
-                            restoreSnapshot(); // 觸發防守懲罰，重置畫面
-                            isMoving = false;
-                        }, 800);
-                    }
-                }
+    // 檢查白球是否進袋
+    if (!cueBall.isPotted) {
+        const pdx = cueBall.x - pocket.x;
+        const pdy = cueBall.y - pocket.y;
+        // 使用袋口自身的半徑做判定
+        if (Math.sqrt(pdx * pdx + pdy * pdy) < pocket.radius + 6) {
+            playPocketSound();
+            cueBall.isPotted = true;
+            cueBall.vx = 0;
+            cueBall.vy = 0;
+            setTimeout(() => {
+                restoreSnapshot();
+                isMoving = false;
+            }, 800);
+        }
+    }
 
-                // 檢查子球進袋
-                balls.forEach(ball => {
-                    if (ball.isPotted) return;
-                    const pdx = ball.x - pocket.x;
-                    const pdy = ball.y - pocket.y;
-                    if (Math.sqrt(pdx * pdx + pdy * pdy) < 35) {
-                        playPocketSound();
-                        
-                        if (!breakDone) return; // 開球第一桿不計算得分
+    // 檢查子球進袋
+    balls.forEach(ball => {
+        if (ball.isPotted) return;
+        const pdx = ball.x - pocket.x;
+        const pdy = ball.y - pocket.y;
+        // 使用袋口自身的半徑做判定
+        if (Math.sqrt(pdx * pdx + pdy * pdy) < pocket.radius + 3) {
+            playPocketSound();
+            
+            if (!breakDone) return;
 
-                        // 判斷是否按照順序進袋
-                        const unpottedBalls = balls.filter(b => !b.isPotted).sort((a, b) => a.id - b.id);
-                        const minId = unpottedBalls.length > 0 ? unpottedBalls[0].id : 0;
+            const unpottedBalls = balls.filter(b => !b.isPotted).sort((a, b) => a.id - b.id);
+            const minId = unpottedBalls.length > 0 ? unpottedBalls[0].id : 0;
 
-                        ball.isPotted = true;
-                        ball.vx = 0;
-                        ball.vy = 0;
+            ball.isPotted = true;
+            ball.vx = 0;
+            ball.vy = 0;
 
-                        if (ball.id === minId) {
-                            score += 1; // 順序正確，得 1 分
-                        } else {
-                            score += 0; // 順序錯誤，得 0 分
-                        }
-                        scoreDisplayEl.textContent = score;
-                    }
-                });
-            });
+            if (ball.id === minId) {
+                score += 1;
+            } else {
+                score += 0;
+            }
+            scoreDisplayEl.textContent = score;
+        }
+    });
+});
 
             if (isMoving && !anyMoving) {
                 isMoving = false;
@@ -602,23 +608,23 @@ function fireCueBall() {
             ctx.stroke();
             ctx.setLineDash([]);
 
-            pockets.forEach(pocket => {
-                ctx.beginPath();
-                ctx.arc(pocket.x, pocket.y, 32, 0, Math.PI * 2);
-                ctx.fillStyle = '#022c22';
-                ctx.fill();
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = pocket.isOpen ? '#065f46' : '#991b1b';
-                ctx.stroke();
+pockets.forEach(pocket => {
+    ctx.beginPath();
+    ctx.arc(pocket.x, pocket.y, pocket.radius, 0, Math.PI * 2); // 這裡改用 pocket.radius
+    ctx.fillStyle = '#022c22';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = pocket.isOpen ? '#065f46' : '#991b1b';
+    ctx.stroke();
 
-                if (!pocket.isOpen) {
-                    ctx.fillStyle = '#fca5a5';
-                    ctx.font = '9px sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('🔒', pocket.x, pocket.y);
-                }
-            });
+    if (!pocket.isOpen) {
+        ctx.fillStyle = '#fca5a5';
+        ctx.font = '9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🔒', pocket.x, pocket.y);
+    }
+});
 
             if (isAiming && touchA && touchB && !isMoving && !cueBall.isPotted) {
                 const dx = touchA.x - touchB.x;
