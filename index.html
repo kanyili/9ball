@@ -632,8 +632,11 @@ pockets.forEach(pocket => {
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
                 if (distance >= 5) {
-                    const maxPower = 40;
-                    const powerFactor = 0.50;
+const maxPower = 40;
+                    // 同步手機與 PC 的力道係數，讓預測軌跡線準確對應實際擊球
+                    const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+                    const powerFactor = isTouchDevice ? 0.18 : 0.40; 
+                    
                     let forceX = dx * powerFactor;
                     let forceY = dy * powerFactor;
                     const speed = Math.sqrt(forceX * forceX + forceY * forceY);
