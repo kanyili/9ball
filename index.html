@@ -235,23 +235,21 @@
             setupPockets(breakDone);
         }
 
-function setupPockets(allOpen) {
-    const margin = 14;
-    const pocketOffset = 5;
-    
-    // 依據螢幕尺寸動態調整袋口判定範圍（手機版稍微縮小，避免太容易進球）
-    const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-    const pocketRadius = isTouchDevice ? 28 : 32; // 手機用 28，PC用 32
+        function setupPockets(allOpen) {
+            const margin = 14;
+            const pocketOffset = 5;
+            const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+            const pocketRadius = isTouchDevice ? 28 : 32;
 
-    pockets = [
-        { x: margin + pocketOffset, y: margin + pocketOffset, isOpen: allOpen, radius: pocketRadius },
-        { x: tableWidth / 2, y: margin + pocketOffset - 2, isOpen: allOpen, radius: pocketRadius },
-        { x: tableWidth - margin - pocketOffset, y: margin + pocketOffset, isOpen: allOpen, radius: pocketRadius },
-        { x: margin + pocketOffset, y: tableHeight - margin - pocketOffset, isOpen: allOpen, radius: pocketRadius },
-        { x: tableWidth / 2, y: tableHeight - margin - pocketOffset + 2, isOpen: allOpen, radius: pocketRadius },
-        { x: tableWidth - margin - pocketOffset, y: tableHeight - margin - pocketOffset, isOpen: allOpen, radius: pocketRadius }
-    ];
-}
+            pockets = [
+                { x: margin + pocketOffset, y: margin + pocketOffset, isOpen: allOpen, radius: pocketRadius },
+                { x: tableWidth / 2, y: margin + pocketOffset - 2, isOpen: allOpen, radius: pocketRadius },
+                { x: tableWidth - margin - pocketOffset, y: margin + pocketOffset, isOpen: allOpen, radius: pocketRadius },
+                { x: margin + pocketOffset, y: tableHeight - margin - pocketOffset, isOpen: allOpen, radius: pocketRadius },
+                { x: tableWidth / 2, y: tableHeight - margin - pocketOffset + 2, isOpen: allOpen, radius: pocketRadius },
+                { x: tableWidth - margin - pocketOffset, y: tableHeight - margin - pocketOffset, isOpen: allOpen, radius: pocketRadius }
+            ];
+        }
 
         function setAllPocketsState(open) {
             pockets.forEach(p => p.isOpen = open);
@@ -338,6 +336,7 @@ function setupPockets(allOpen) {
             });
         }
 
+        // 統一的手機與 PC 觸控/滑鼠事件處理
         canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
         canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
         canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
@@ -356,7 +355,7 @@ function setupPockets(allOpen) {
         window.addEventListener('mousemove', (e) => {
             if (!isMouseDown || isMoving || cueBall.isPotted) return;
             const rect = canvas.getBoundingClientRect();
-            touchB = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            touchA = { x: e.clientX - rect.left, y: e.clientY - rect.top };
         });
         window.addEventListener('mouseup', () => {
             if (!isMouseDown) return;
@@ -375,12 +374,8 @@ function setupPockets(allOpen) {
             const touches = e.touches;
 
             if (touches.length >= 1) {
+                // 將 touchA 設為當前手指位置，touchB 設為白球位置，使拉桿方向與 PC 完全一致
                 touchA = { x: touches[0].clientX - rect.left, y: touches[0].clientY - rect.top };
-            }
-            if (touches.length >= 2) {
-                touchB = { x: touches[1].clientX - rect.left, y: touches[1].clientY - rect.top };
-                isAiming = true;
-            } else {
                 touchB = { x: cueBall.x, y: cueBall.y };
                 isAiming = true;
             }
@@ -395,9 +390,6 @@ function setupPockets(allOpen) {
             if (touches.length >= 1) {
                 touchA = { x: touches[0].clientX - rect.left, y: touches[0].clientY - rect.top };
             }
-            if (touches.length >= 2) {
-                touchB = { x: touches[1].clientX - rect.left, y: touches[1].clientY - rect.top };
-            }
         }
 
         function handleTouchEnd(e) {
@@ -408,39 +400,34 @@ function setupPockets(allOpen) {
                 touchA = null;
                 touchB = null;
                 isAiming = false;
-            } else if (e.touches.length === 1) {
-                const rect = canvas.getBoundingClientRect();
-                touchA = { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
-                touchB = { x: cueBall.x, y: cueBall.y };
             }
         }
 
-function fireCueBall() {
-    if (!touchA || !touchB) return;
-    const dx = touchA.x - touchB.x;
-    const dy = touchA.y - touchB.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    if (distance < 5) return;
+        function fireCueBall() {
+            if (!touchA || !touchB) return;
+            // 這裡與 PC 相同：dx/dy 為 touchA（手指拖曳位置）減去 touchB（白球位置）
+            const dx = touchA.x - touchB.x;
+            const dy = touchA.y - touchB.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < 5) return;
 
-    const maxPower = 40;
-    
-    // 判斷是否為觸控裝置（手機/平板），如果是就給予較柔和的係數 0.18，PC滑鼠則維持 0.40
-    const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-    const powerFactor = isTouchDevice ? 0.18 : 0.40; 
+            const maxPower = 40;
+            const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+            const powerFactor = isTouchDevice ? 0.18 : 0.40; 
 
-    let forceX = dx * powerFactor;
-    let forceY = dy * powerFactor;
+            let forceX = dx * powerFactor;
+            let forceY = dy * powerFactor;
 
-    const speed = Math.sqrt(forceX * forceX + forceY * forceY);
-    if (speed > maxPower) {
-        forceX = (forceX / speed) * maxPower;
-        forceY = (forceY / speed) * maxPower;
-    }
+            const speed = Math.sqrt(forceX * forceX + forceY * forceY);
+            if (speed > maxPower) {
+                forceX = (forceX / speed) * maxPower;
+                forceY = (forceY / speed) * maxPower;
+            }
 
-    cueBall.vx = forceX;
-    cueBall.vy = forceY;
-    isMoving = true;
-}
+            cueBall.vx = forceX;
+            cueBall.vy = forceY;
+            isMoving = true;
+        }
 
         function updatePhysics() {
             const friction = 0.980;
@@ -524,53 +511,46 @@ function fireCueBall() {
                 }
             }
 
-pockets.forEach(pocket => {
-    if (!pocket.isOpen) return;
+            pockets.forEach(pocket => {
+                if (!pocket.isOpen) return;
 
-    // 檢查白球是否進袋
-    if (!cueBall.isPotted) {
-        const pdx = cueBall.x - pocket.x;
-        const pdy = cueBall.y - pocket.y;
-        // 使用袋口自身的半徑做判定
-        if (Math.sqrt(pdx * pdx + pdy * pdy) < pocket.radius + 6) {
-            playPocketSound();
-            cueBall.isPotted = true;
-            cueBall.vx = 0;
-            cueBall.vy = 0;
-            setTimeout(() => {
-                restoreSnapshot();
-                isMoving = false;
-            }, 800);
-        }
-    }
+                if (!cueBall.isPotted) {
+                    const pdx = cueBall.x - pocket.x;
+                    const pdy = cueBall.y - pocket.y;
+                    if (Math.sqrt(pdx * pdx + pdy * pdy) < pocket.radius + 6) {
+                        playPocketSound();
+                        cueBall.isPotted = true;
+                        cueBall.vx = 0;
+                        cueBall.vy = 0;
+                        setTimeout(() => {
+                            restoreSnapshot();
+                            isMoving = false;
+                        }, 800);
+                    }
+                }
 
-    // 檢查子球進袋
-    balls.forEach(ball => {
-        if (ball.isPotted) return;
-        const pdx = ball.x - pocket.x;
-        const pdy = ball.y - pocket.y;
-        // 使用袋口自身的半徑做判定
-        if (Math.sqrt(pdx * pdx + pdy * pdy) < pocket.radius + 3) {
-            playPocketSound();
-            
-            if (!breakDone) return;
+                balls.forEach(ball => {
+                    if (ball.isPotted) return;
+                    const pdx = ball.x - pocket.x;
+                    const pdy = ball.y - pocket.y;
+                    if (Math.sqrt(pdx * pdx + pdy * pdy) < pocket.radius + 3) {
+                        playPocketSound();
+                        if (!breakDone) return;
 
-            const unpottedBalls = balls.filter(b => !b.isPotted).sort((a, b) => a.id - b.id);
-            const minId = unpottedBalls.length > 0 ? unpottedBalls[0].id : 0;
+                        const unpottedBalls = balls.filter(b => !b.isPotted).sort((a, b) => a.id - b.id);
+                        const minId = unpottedBalls.length > 0 ? unpottedBalls[0].id : 0;
 
-            ball.isPotted = true;
-            ball.vx = 0;
-            ball.vy = 0;
+                        ball.isPotted = true;
+                        ball.vx = 0;
+                        ball.vy = 0;
 
-            if (ball.id === minId) {
-                score += 1;
-            } else {
-                score += 0;
-            }
-            scoreDisplayEl.textContent = score;
-        }
-    });
-});
+                        if (ball.id === minId) {
+                            score += 1;
+                        }
+                        scoreDisplayEl.textContent = score;
+                    }
+                });
+            });
 
             if (isMoving && !anyMoving) {
                 isMoving = false;
@@ -586,7 +566,7 @@ pockets.forEach(pocket => {
                         victoryModal.classList.remove('hidden');
                         setTimeout(() => victoryModal.classList.remove('opacity-0'), 10);
                     } else {
-                        saveSnapshot(); // 保存新一桿的初始位置
+                        saveSnapshot();
                     }
                 }
             }
@@ -608,23 +588,23 @@ pockets.forEach(pocket => {
             ctx.stroke();
             ctx.setLineDash([]);
 
-pockets.forEach(pocket => {
-    ctx.beginPath();
-    ctx.arc(pocket.x, pocket.y, pocket.radius, 0, Math.PI * 2); // 這裡改用 pocket.radius
-    ctx.fillStyle = '#022c22';
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = pocket.isOpen ? '#065f46' : '#991b1b';
-    ctx.stroke();
+            pockets.forEach(pocket => {
+                ctx.beginPath();
+                ctx.arc(pocket.x, pocket.y, pocket.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#022c22';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = pocket.isOpen ? '#065f46' : '#991b1b';
+                ctx.stroke();
 
-    if (!pocket.isOpen) {
-        ctx.fillStyle = '#fca5a5';
-        ctx.font = '9px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('🔒', pocket.x, pocket.y);
-    }
-});
+                if (!pocket.isOpen) {
+                    ctx.fillStyle = '#fca5a5';
+                    ctx.font = '9px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('🔒', pocket.x, pocket.y);
+                }
+            });
 
             if (isAiming && touchA && touchB && !isMoving && !cueBall.isPotted) {
                 const dx = touchA.x - touchB.x;
@@ -632,8 +612,7 @@ pockets.forEach(pocket => {
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
                 if (distance >= 5) {
-const maxPower = 40;
-                    // 同步手機與 PC 的力道係數，讓預測軌跡線準確對應實際擊球
+                    const maxPower = 40;
                     const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
                     const powerFactor = isTouchDevice ? 0.18 : 0.40; 
                     
@@ -777,14 +756,13 @@ const maxPower = 40;
                 ctx.fill();
 
                 ctx.fillStyle = '#0f172a';
-// 判斷是否為手機觸控裝置，如果是則放大字體比例，PC則維持較小比例
-const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-const fontMultiplier = isTouchDevice ? 1.2 : 0.85;
+                const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+                const fontMultiplier = isTouchDevice ? 1.2 : 0.85;
 
-ctx.font = `bold ${Math.floor(ball.radius * fontMultiplier)}px sans-serif`;
-ctx.textAlign = 'center';
-ctx.textBaseline = 'middle';
-ctx.fillText(ball.label, ball.x, ball.y);
+                ctx.font = `bold ${Math.floor(ball.radius * fontMultiplier)}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(ball.label, ball.x, ball.y);
             });
         }
 
