@@ -221,7 +221,7 @@
             victoryModal.classList.add('hidden', 'opacity-0');
 
             setupTableDimensions();
-            setupPockets(false); // 第一局開局時設為上鎖狀態
+            setupPockets(false); 
             setupBalls();
             saveSnapshot();
             
@@ -317,6 +317,7 @@
 
                 balls.push({
                     id: ballNum,
+                    sequenceIndex: index, // 記錄金句文字的先後順序索引
                     label: char,
                     x: x,
                     y: y,
@@ -566,7 +567,6 @@
             pockets.forEach(pocket => {
                 if (!pocket.isOpen) return;
 
-                // 已經解鎖後的正常進洞判定
                 if (!cueBall.isPotted) {
                     const pdx = cueBall.x - pocket.x;
                     const pdy = cueBall.y - pocket.y;
@@ -590,14 +590,15 @@
                         playPocketSound();
                         if (!breakDone) return;
 
-                        const unpottedBalls = balls.filter(b => !b.isPotted).sort((a, b) => a.id - b.id);
-                        const minId = unpottedBalls.length > 0 ? unpottedBalls[0].id : 0;
+                        // 修正點：改用 sequenceIndex (金句文字順序) 來判定當前正確目標球
+                        const unpottedBalls = balls.filter(b => !b.isPotted).sort((a, b) => a.sequenceIndex - b.sequenceIndex);
+                        const targetSeqIndex = unpottedBalls.length > 0 ? unpottedBalls[0].sequenceIndex : -1;
 
                         ball.isPotted = true;
                         ball.vx = 0;
                         ball.vy = 0;
 
-                        if (ball.id === minId) {
+                        if (ball.sequenceIndex === targetSeqIndex) {
                             score += 1;
                         }
                         scoreDisplayEl.textContent = score;
@@ -605,11 +606,9 @@
                 });
             });
 
-            // 當所有球停止移動時
             if (isMoving && !anyMoving) {
                 isMoving = false;
                 if (!breakDone) {
-                    // 檢查第一局開球結束後，母球是否停在任何一個洞的範圍內
                     let inPocketRange = false;
                     pockets.forEach(pocket => {
                         const pdx = cueBall.x - pocket.x;
@@ -623,12 +622,11 @@
                         playPocketSound();
                         cueBall.isPotted = true;
                         setTimeout(() => {
-                            initGame(); // 遊戲直接重新開始
+                            initGame(); 
                         }, 500);
                         return;
                     }
 
-                    // 沒掉進洞的話，開球結束，球袋自動解鎖開放
                     breakDone = true;
                     setAllPocketsState(true); 
                 }
@@ -761,8 +759,9 @@
                 }
             }
 
-            const unpottedBalls = balls.filter(b => !b.isPotted).sort((a, b) => a.id - b.id);
-            const currentTargetId = (breakDone && unpottedBalls.length > 0) ? unpottedBalls[0].id : -1;
+            // 修正點：畫布繪製高亮目標球時，也改用 sequenceIndex 排序
+            const unpottedBalls = balls.filter(b => !b.isPotted).sort((a, b) => a.sequenceIndex - b.sequenceIndex);
+            const currentTargetSeqIndex = (breakDone && unpottedBalls.length > 0) ? unpottedBalls[0].sequenceIndex : -1;
 
             if (!cueBall.isPotted) {
                 if (!isMoving) {
@@ -791,7 +790,7 @@
 
             balls.forEach(ball => {
                 if (ball.isPotted) return;
-                const isTarget = (ball.id === currentTargetId);
+                const isTarget = (ball.sequenceIndex === currentTargetSeqIndex);
                 
                 if (isTarget) {
                     const pulse = Math.sin(animationTime * 3);
