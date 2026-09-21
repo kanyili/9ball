@@ -41,7 +41,7 @@
         }
     </style>
 </head>
-<body class="w-screen h-[100dvh] flex flex-col items-center justify-between p-1 overflow-hidden">
+<body class="w-screen h-[100dvh] flex flex-col items-center justify-between p-0.5 overflow-hidden">
 
     <!-- 旋轉提示層：當手機直立時顯示，要求轉為橫向 -->
     <div id="orientation-lock" class="fixed inset-0 bg-slate-950/95 z-50 flex-col items-center justify-center p-6 text-center hidden">
@@ -51,23 +51,30 @@
     </div>
 
     <!-- 頂端資訊列：金句與即時得分 -->
-    <header class="w-full max-w-3xl flex items-center justify-between py-1 px-3 z-10 bg-slate-900/80 rounded border border-amber-500/20 shrink-0">
+    <header class="w-full max-w-3xl flex items-center justify-between py-0 px-3 z-10 bg-slate-900/80 rounded border border-amber-500/20 shrink-0">
         <div id="verse-ref" class="text-[11px] text-amber-300 font-medium truncate mr-2">載入中...</div>
         <div class="text-xs text-emerald-400 font-bold shrink-0">得分: <span id="score-display">0</span> 分</div>
     </header>
 
-    <!-- 水平力道強度顯示列：介於頂端訊息框與撞球檯之間 -->
-    <div id="power-meter-container" class="w-full max-w-3xl z-20 flex items-center justify-center gap-2 bg-slate-900/80 border border-amber-500/30 rounded py-1 px-3 shadow-lg hidden shrink-0">
-        <span class="text-[10px] text-amber-300 font-bold">力道</span>
-        <div class="flex-1 h-2.5 bg-slate-800 rounded-full overflow-hidden flex border border-slate-700">
-            <div id="power-fill" class="h-full bg-gradient-to-r from-emerald-500 via-amber-500 to-rose-500 w-0 transition-all duration-75"></div>
-        </div>
-        <span id="power-text" class="text-[10px] text-amber-300 font-bold w-8 text-right">0%</span>
-    </div>
-
-    <!-- 主遊戲區 -->
+    <!-- 主遊戲區：使用緊湊比例確保完全不超出畫面 -->
     <main class="relative w-full flex-1 flex items-center justify-center overflow-hidden py-0.5">
         
+        <!-- 左側垂直力道強度顯示條 -->
+        <div id="power-meter-container" class="absolute left-3 z-20 flex flex-col items-center bg-slate-900/80 border border-amber-500/30 rounded-lg p-1.5 shadow-lg hidden">
+            <span id="power-text" class="text-[9px] text-amber-300 mb-1 font-bold">0%</span>
+            <div class="w-2.5 h-28 bg-slate-800 rounded-full overflow-hidden flex flex-col-reverse border border-slate-700">
+                <div id="power-fill" class="w-full bg-gradient-to-t from-emerald-500 via-amber-500 to-rose-500 h-0 transition-all duration-75"></div>
+            </div>
+        </div>
+
+        <!-- 右側垂直力道強度顯示條 -->
+        <div id="power-meter-container-right" class="absolute right-3 z-20 flex flex-col items-center bg-slate-900/80 border border-amber-500/30 rounded-lg p-1.5 shadow-lg hidden">
+            <span id="power-text-right" class="text-[9px] text-amber-300 mb-1 font-bold">0%</span>
+            <div class="w-2.5 h-28 bg-slate-800 rounded-full overflow-hidden flex flex-col-reverse border border-slate-700">
+                <div id="power-fill-right" class="w-full bg-gradient-to-t from-emerald-500 via-amber-500 to-rose-500 h-0 transition-all duration-75"></div>
+            </div>
+        </div>
+
         <div id="table-container" class="relative bg-emerald-900 rounded-xl p-1.5 shadow-2xl border-2 border-amber-900/60 flex items-center justify-center overflow-hidden">
             <canvas id="billiardCanvas" class="w-full h-full rounded-lg bg-emerald-800 shadow-inner"></canvas>
         </div>
@@ -175,9 +182,15 @@
         const finalScoreText = document.getElementById('final-score-text');
         const restartBtn = document.getElementById('restart-btn');
         const tableContainer = document.getElementById('table-container');
+        
+        // 抓取左右兩側力道條的元素
         const powerMeterContainer = document.getElementById('power-meter-container');
         const powerFill = document.getElementById('power-fill');
         const powerText = document.getElementById('power-text');
+
+        const powerMeterContainerRight = document.getElementById('power-meter-container-right');
+        const powerFillRight = document.getElementById('power-fill-right');
+        const powerTextRight = document.getElementById('power-text-right');
 
         let tableWidth = 800;
         let tableHeight = 400;
@@ -235,7 +248,7 @@
             const containerRect = container.parentElement.getBoundingClientRect();
             
             let w = containerRect.width * 0.96;
-            let h = containerRect.height * 0.76;
+            let h = containerRect.height * 0.78;
             
             if (w / h > 1.9) {
                 w = h * 1.9;
@@ -373,6 +386,7 @@
             touchB = { x: cueBall.x, y: cueBall.y };
             isAiming = true;
             powerMeterContainer.classList.remove('hidden');
+            powerMeterContainerRight.classList.remove('hidden');
             updatePowerMeter();
         });
         window.addEventListener('mousemove', (e) => {
@@ -389,7 +403,9 @@
             touchB = null;
             isAiming = false;
             powerMeterContainer.classList.add('hidden');
+            powerMeterContainerRight.classList.add('hidden');
             powerFill.classList.remove('animate-power-blink');
+            powerFillRight.classList.remove('animate-power-blink');
         });
 
         function handleTouchStart(e) {
@@ -404,6 +420,7 @@
                 touchB = { x: cueBall.x, y: cueBall.y };
                 isAiming = true;
                 powerMeterContainer.classList.remove('hidden');
+                powerMeterContainerRight.classList.remove('hidden');
                 updatePowerMeter();
             }
         }
@@ -429,7 +446,9 @@
                 touchB = null;
                 isAiming = false;
                 powerMeterContainer.classList.add('hidden');
+                powerMeterContainerRight.classList.add('hidden');
                 powerFill.classList.remove('animate-power-blink');
+                powerFillRight.classList.remove('animate-power-blink');
             }
         }
 
@@ -448,13 +467,18 @@
             const currentPower = Math.min(speed, maxPower);
             const percentage = Math.round((currentPower / maxPower) * 100);
             
-            powerFill.style.width = `${percentage}%`;
+            // 同步更新左右兩側的力道條與數值
+            powerFill.style.height = `${percentage}%`;
             powerText.textContent = `${percentage}%`;
+            powerFillRight.style.height = `${percentage}%`;
+            powerTextRight.textContent = `${percentage}%`;
 
             if (percentage >= 100) {
                 powerFill.classList.add('animate-power-blink');
+                powerFillRight.classList.add('animate-power-blink');
             } else {
                 powerFill.classList.remove('animate-power-blink');
+                powerFillRight.classList.remove('animate-power-blink');
             }
         }
 
